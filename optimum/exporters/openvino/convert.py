@@ -279,6 +279,7 @@ def export_pytorch(
 
         # Check that inputs match, and order them properly
         dummy_inputs = config.generate_dummy_inputs(framework="pt", **input_shapes)
+        dummy_inputs.update({"position_ids":torch.tensor([[16]],dtype=torch.long)})
         device = torch.device(device)
         if device.type == "cuda" and torch.cuda.is_available():
             model.to(device)
@@ -287,6 +288,7 @@ def export_pytorch(
             )
         check_dummy_inputs_are_allowed(model, dummy_inputs)
         inputs = config.ordered_inputs(model)
+        inputs.update({"position_ids": {0: 'batch_size'}})
         input_names = list(inputs.keys())
         output_names = list(config.outputs.keys())
         if hasattr(model, "forward"):
@@ -330,6 +332,9 @@ def export_pytorch(
             )
         ordered_dummy_inputs = {param: dummy_inputs[param] for param in sig.parameters if param in dummy_inputs}
         ordered_input_names = list(inputs)
+        last_names_list = ordered_input_names.pop()
+        ordered_input_names.insert(2, last_names_list)
+        logger.warning(f"Ordered input names with position_ids in: {ordered_input_names}")
         flatten_inputs = flattenize_inputs(ordered_dummy_inputs.values())
         ov_model.validate_nodes_and_infer_types()
         for idx, out_tensor in enumerate(ov_model.outputs):
