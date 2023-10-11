@@ -277,9 +277,42 @@ class OVBaseDecoderModel(OVModel):
                 shapes[inputs][1] = -1
         model.reshape(shapes)
         return model
+    
+    def _reshape_kvcache(
+        self,
+        model: openvino.runtime.Model,
+        batch_size: int,
+        sequence_length: int,
+        height: int = None,
+        width: int = None,
+    ):
+        if height is not None:
+            logger.warning(f"`height` set to `{height}` will be ignored during reshaping operation.")
+
+        if width is not None:
+            logger.warning(f"`width` set to `{width}` will be ignored during reshaping operation.")
+
+        shapes = {}
+        for inputs in model.inputs:
+            shapes[inputs] = inputs.get_partial_shape()
+            shapes[inputs][0] = batch_size
+            input_name = inputs.get_any_name()
+            if input_name.startswith("past_key_values"):
+                if len(inputs.partial_shape) == 3 and input_name.endswith("value"):
+                    shapes[inputs][1] = 1
+                else:
+                    shapes[inputs][2] = sequence_length -1
+            elif input_name.startswith("attention_mask"):
+                shapes[inputs][1] = sequence_length
+            else:
+                shapes[inputs][1] = 1
+        model.reshape(shapes)
+        return model
 
     def reshape(self, batch_size: int, sequence_length: int):
         logger.warning("Static shapes are not supported for causal language model.")
+        logger.warning("Modified dynamic model forcefully to be static shape.")
+        self.model = self._reshape_kvcache(self.model, batch_size, sequence_length)
         return self
 
     def compile(self):
