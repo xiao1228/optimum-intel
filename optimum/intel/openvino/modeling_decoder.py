@@ -192,7 +192,10 @@ class OVBaseDecoderModel(OVModel):
             save_directory (`str` or `Path`):
                 The directory where to save the model files.
         """
-        model_to_save = self.model if self._pkv_precision == Type.f32 else self._original_model
+        if not self.use_cache:
+            model_to_save = self.model 
+        else:
+            model_to_save = self.model if self._pkv_precision == Type.f32 else self._original_model
         dst_path = os.path.join(save_directory, OV_XML_FILE_NAME)
         openvino.save_model(model_to_save, dst_path, compress_to_fp16=False)
 
@@ -303,6 +306,8 @@ class OVBaseDecoderModel(OVModel):
                 else:
                     shapes[inputs][2] = sequence_length -1
             elif input_name.startswith("attention_mask"):
+                shapes[inputs][1] = sequence_length
+            elif self.use_cache is False:
                 shapes[inputs][1] = sequence_length
             else:
                 shapes[inputs][1] = 1
